@@ -132,21 +132,35 @@ x-scriber/
 │   ├── templates/            # HTML templates
 │   ├── static/               # CSS, JS assets
 │   └── tests/                # Unit tests
+├── tests/                    # Integration tests
+├── docs/                     # Documentation
+│   ├── TODO.md              # Project progress tracking
+│   ├── user_todo.md         # User setup requirements
+│   └── interface.md         # API interface documentation
 ├── data/                     # Local data storage
 │   ├── project_metadata/     # Project information
 │   ├── audio-recordings/     # Audio chunks
 │   ├── raw-transcriptions/   # Whisper outputs
 │   └── output/               # Generated TRDs
+├── CLAUDE.md                 # Claude Code assistant rules
+├── README.md                 # This file
 └── requirements.txt          # Python dependencies
 ```
 
 ### Adding New Features
 
-1. Write tests first (`xscriber/tests/`)
+1. Write tests first (`xscriber/tests/` or `tests/`)
 2. Implement functionality in appropriate module
 3. Update Django views if needed
 4. Test thoroughly
 5. Update documentation
+
+### Documentation
+
+For detailed documentation, see the `docs/` folder:
+- [`docs/TODO.md`](docs/TODO.md) - Project progress and task tracking
+- [`docs/user_todo.md`](docs/user_todo.md) - User setup requirements and dependencies
+- [`docs/interface.md`](docs/interface.md) - API interface contracts and specifications
 
 ## Troubleshooting
 

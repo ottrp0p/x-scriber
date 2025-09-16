@@ -62,3 +62,7 @@ data/project_metadata/.gitkeep
 data/audio-recordings/.gitkeep
 data/raw-transcriptions/.gitkeep
 data/output/.gitkeep
+
+# Test files (optional - you may want to track test results)
+tests/__pycache__/
+*.pyc

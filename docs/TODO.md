@@ -35,10 +35,11 @@
 ✅ CLAUDE.md restrictions to protect user data
 
 ### Next Steps for User:
-1. Review user_todo.md for required environment setup
+1. Review docs/user_todo.md for required environment setup
 2. Install Python dependencies: `pip install -r requirements.txt`
 3. Configure .env file with OpenAI API key
 4. Run Django setup: `python manage.py migrate`
 5. Start development server: `python manage.py runserver`
 6. Open browser to http://localhost:8000
 7. Test with sample project or create new project
+8. Run integration tests: `python tests/test_openai.py` and `python tests/test_workflow.py`

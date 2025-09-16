@@ -36,7 +36,8 @@ These sample files should remain untouched after initial creation.
 - Test files in `xscriber/tests/`
 - Configuration files (settings.py, urls.py, etc.)
 - Requirements and dependency files
-- Documentation files (README.md, etc.)
+- Documentation files (README.md, docs/*.md, etc.)
+- Test files (tests/*.py, xscriber/tests/*.py)
 
 ### Code Quality Guidelines:
 - Follow Django conventions and best practices
