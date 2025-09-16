@@ -165,6 +165,157 @@ class ChatCompletionProcessor:
         updated_ontology = self.update_trd_sections(ontology, transcription)
         return self.generate_trd_document(updated_ontology)
 
+    def process_all_transcriptions_to_trd(self, all_transcriptions: List[str], existing_trd: str = "") -> str:
+        """
+        Process all transcriptions at once to generate a comprehensive TRD.
+        This method reduces duplication by considering all transcription context together.
+        """
+        # Combine all transcriptions into a single context
+        combined_transcriptions = "\n\n---\n\n".join(all_transcriptions)
+
+        # Use the truly comprehensive single-pass method
+        return self.generate_trd_holistically(combined_transcriptions, existing_trd)
+
+    def update_trd_sections_comprehensive(self, ontology: Dict[str, str], all_transcriptions: str) -> Dict[str, str]:
+        """
+        Update all TRD sections by processing all transcriptions together.
+        This provides better context and reduces duplication.
+        """
+        updated_ontology = {}
+
+        for section_name, existing_content in ontology.items():
+            updated_content = self.update_trd_section_comprehensive(
+                section_name, existing_content, all_transcriptions
+            )
+            updated_ontology[section_name] = updated_content
+
+        return updated_ontology
+
+    def update_trd_section_comprehensive(self, section_name: str, existing_content: str, all_transcriptions: str) -> str:
+        """
+        Update a TRD section considering all transcriptions as context.
+        """
+        prompt_template = self.trd_ontology_prompts.get(section_name, "Update this section with new information")
+
+        system_prompt = f"""You are a technical documentation expert. Your task is to {prompt_template}.
+
+        You are given ALL transcriptions from this project session, providing complete context for creating comprehensive documentation.
+
+        CRITICAL RULES:
+        1. NEVER include section headers (like # Overview, ## Requirements, etc.) in your response
+        2. Only return the CONTENT of the section, not the header
+        3. Only include information relevant to the {section_name} section
+        4. Synthesize information from ALL transcriptions to create coherent, comprehensive content
+        5. Avoid duplicating the same information multiple times
+        6. Merge related concepts and requirements intelligently
+        7. Maintain professional technical writing style
+        8. Use markdown formatting appropriately (bullets, bold, etc.) but NO headers
+        9. If no relevant information exists in the transcriptions, return "To be defined"
+        10. Create a complete section that stands alone, don't just append information
+        """
+
+        user_prompt = f"""Existing {section_name} content:
+        {existing_content}
+
+        All project transcriptions to incorporate:
+        {all_transcriptions}
+
+        Please create a comprehensive {section_name} section that incorporates all relevant information:"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000  # Increased for comprehensive content
+            )
+
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"Failed to update {section_name} section comprehensively: {str(e)}")
+            return existing_content
+
+    def generate_trd_holistically(self, all_transcriptions: str, existing_trd: str = "") -> str:
+        """
+        Generate the entire TRD in a single LLM call, processing all transcriptions holistically.
+        This eliminates subsection processing and creates a truly comprehensive document.
+        """
+        system_prompt = """You are a technical documentation expert. Your task is to create a comprehensive Technical Requirements Document (TRD) based on all provided transcriptions.
+
+        You must generate a COMPLETE TRD document in a single response that synthesizes all transcription content intelligently.
+
+        CRITICAL REQUIREMENTS:
+        1. Generate the COMPLETE TRD document with all sections in one response
+        2. Use this EXACT structure and headers:
+           # Technical Requirements Document
+           ## Overview
+           ## Requirements
+           ## Technical Specifications
+           ## Architecture
+           ## Constraints
+           ## Assumptions
+           ## Acceptance Criteria
+           ## Dependencies
+        3. Synthesize information from ALL transcriptions to avoid duplication
+        4. Merge related concepts intelligently across different transcription chunks
+        5. Maintain professional technical writing style throughout
+        6. Each section should be comprehensive and self-contained
+        7. Use markdown formatting (bullets, bold, etc.) appropriately
+        8. If a section has no relevant information, write "To be defined"
+        9. End with timestamp: *Generated by X-Scriber on [timestamp]*
+        10. Create a cohesive document that reads as if written by a single technical writer
+
+        SYNTHESIS GUIDELINES:
+        - Combine duplicate information into single, comprehensive statements
+        - Organize requirements logically within each section
+        - Cross-reference related information between sections naturally
+        - Maintain consistency in terminology and technical details
+        - Prioritize clarity and completeness over brevity
+        """
+
+        context_info = f"Existing TRD to update (if any):\n{existing_trd}\n\n" if existing_trd else "Creating new TRD from scratch.\n\n"
+
+        user_prompt = f"""{context_info}All project transcriptions to incorporate:
+        {all_transcriptions}
+
+        Generate a complete, comprehensive Technical Requirements Document that synthesizes all this information:"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=4096  # Maximum for comprehensive single response
+            )
+
+            generated_trd = response.choices[0].message.content.strip()
+
+            # Add timestamp if not already present
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            if "*Generated by X-Scriber on" not in generated_trd:
+                generated_trd += f"\n\n---\n*Generated by X-Scriber on {timestamp}*\n"
+
+            return generated_trd
+
+        except Exception as e:
+            print(f"Failed to generate TRD holistically: {str(e)}")
+            # Fallback to section-based method
+            if existing_trd:
+                ontology = self.parse_trd_ontology(existing_trd)
+            else:
+                ontology = {section: "To be defined" for section in self.trd_ontology_prompts.keys()}
+
+            updated_ontology = self.update_trd_sections_comprehensive(ontology, all_transcriptions)
+            return self.generate_trd_document(updated_ontology)
+
     def save_trd_document(self, trd_content: str, output_path: str) -> bool:
         try:
             output_dir = Path(output_path).parent

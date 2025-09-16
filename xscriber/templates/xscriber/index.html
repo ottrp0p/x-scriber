@@ -144,6 +144,10 @@
             border-left-color: #2980b9;
         }
 
+        .project-item {
+            position: relative;
+        }
+
         .project-item h4 {
             margin-bottom: 5px;
             font-size: 16px;
@@ -152,6 +156,30 @@
         .project-item p {
             font-size: 12px;
             opacity: 0.8;
+        }
+
+        .delete-project-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .delete-project-btn:hover {
+            opacity: 1;
+            background: #c0392b;
         }
 
         .content-area {
@@ -267,6 +295,7 @@
             <button id="new-project-btn" class="btn btn-primary">New Project</button>
             <button id="record-btn" class="btn btn-success" disabled>Start Recording</button>
             <button id="stop-btn" class="btn btn-danger" disabled>Stop Recording</button>
+            <button id="refresh-btn" class="btn btn-secondary">🔄 Refresh</button>
             <span id="recording-status" class="recording-status inactive">Not Recording</span>
         </div>
 
@@ -353,6 +382,7 @@
                 document.getElementById('new-project-btn').addEventListener('click', () => this.showNewProjectModal());
                 document.getElementById('record-btn').addEventListener('click', () => this.startRecording());
                 document.getElementById('stop-btn').addEventListener('click', () => this.stopRecording());
+                document.getElementById('refresh-btn').addEventListener('click', () => this.manualRefresh());
                 document.getElementById('create-project-btn').addEventListener('click', () => this.createProject());
                 document.getElementById('cancel-project-btn').addEventListener('click', () => this.hideNewProjectModal());
 
@@ -371,7 +401,8 @@
                     this.projects = data.projects || [];
                     this.renderProjects();
 
-                    if (this.projects.length > 0) {
+                    // Only auto-select first project if no project is currently selected
+                    if (this.projects.length > 0 && !this.currentProject) {
                         this.selectProject(this.projects[0].project_id);
                     }
                 } catch (error) {
@@ -390,22 +421,37 @@
 
                 projectList.innerHTML = this.projects.map(project => `
                     <div class="project-item" data-project-id="${project.project_id}">
+                        <button class="delete-project-btn" data-project-id="${project.project_id}" title="Delete Project">×</button>
                         <h4>${project.name}</h4>
                         <p>${project.description || 'No description'}</p>
-                        <small>Updated: ${new Date(project.last_updated).toLocaleDateString()}</small>
+                        <small>Updated: ${this.formatDateTime(project.last_updated)}</small>
                     </div>
                 `).join('');
 
                 projectList.querySelectorAll('.project-item').forEach(item => {
-                    item.addEventListener('click', () => {
+                    item.addEventListener('click', (e) => {
+                        // Don't select project if delete button was clicked
+                        if (e.target.classList.contains('delete-project-btn')) {
+                            return;
+                        }
                         const projectId = item.dataset.projectId;
                         this.selectProject(projectId);
+                    });
+                });
+
+                // Add delete button event listeners
+                projectList.querySelectorAll('.delete-project-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent project selection
+                        const projectId = btn.dataset.projectId;
+                        this.deleteProject(projectId);
                     });
                 });
             }
 
             async selectProject(projectId) {
                 try {
+                    console.log(`Selecting project: ${projectId}`);
                     this.currentProject = projectId;
 
                     document.querySelectorAll('.project-item').forEach(item => {
@@ -419,7 +465,9 @@
 
                     document.getElementById('project-content').textContent = data.trd_content || 'No TRD content available';
 
+                    // Load transcriptions for this project
                     await this.loadTranscriptions(projectId);
+                    console.log(`Project ${projectId} selected and transcriptions loaded`);
 
                 } catch (error) {
                     console.error('Error selecting project:', error);
@@ -429,9 +477,11 @@
 
             async loadTranscriptions(projectId) {
                 try {
+                    console.log(`Loading transcriptions for project: ${projectId}`);
                     const response = await fetch(`/api/projects/${projectId}/transcriptions/`);
                     const data = await response.json();
                     this.transcriptions = data.transcriptions || [];
+                    console.log(`Loaded ${this.transcriptions.length} transcriptions for project ${projectId}`);
                     this.renderTranscriptions();
                 } catch (error) {
                     console.error('Error loading transcriptions:', error);
@@ -512,7 +562,9 @@
                     if (response.ok) {
                         this.hideNewProjectModal();
                         await this.loadProjects();
-                        this.selectProject(data.project_id);
+                        // Ensure we select and load the new project
+                        await this.selectProject(data.project_id);
+                        console.log(`New project created and selected: ${data.project_id}`);
                     } else {
                         this.showError(data.error || 'Failed to create project');
                     }
@@ -607,6 +659,16 @@
 
                     console.log('Recording stopped successfully');
 
+                    // Aggressive refresh after stopping to catch any final transcriptions
+                    console.log('Performing final refresh after recording stop...');
+                    await this.manualRefresh();
+
+                    // Wait a bit and refresh again to catch any delayed processing
+                    setTimeout(async () => {
+                        console.log('Performing delayed refresh to catch final transcriptions...');
+                        await this.manualRefresh();
+                    }, 5000);
+
                 } catch (error) {
                     console.error('Error stopping recording:', error);
                     this.showError('Failed to stop recording');
@@ -623,8 +685,7 @@
                     // Create FormData for upload
                     const formData = new FormData();
                     formData.append('project_id', this.currentProject);
-                    formData.append('chunk_number', this.chunkCounter);
-                    formData.append('audio_chunk', audioBlob, `chunk_${this.chunkCounter}.webm`);
+                    formData.append('audio_chunk', audioBlob, `chunk.webm`);
 
                     // Upload the chunk
                     const response = await fetch('/api/recording/upload_chunk/', {
@@ -634,8 +695,8 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        console.log(`Uploaded chunk ${this.chunkCounter}:`, data);
-                        this.chunkCounter++;
+                        console.log(`Uploaded audio chunk:`, data);
+                        this.chunkCounter++; // Keep incrementing for UI purposes
                     } else {
                         console.error('Failed to upload audio chunk:', response.statusText);
                     }
@@ -667,18 +728,147 @@
             }
 
             startPollingForUpdates() {
-                this.pollingInterval = setInterval(() => {
+                // More aggressive polling during recording - every 3 seconds
+                this.pollingInterval = setInterval(async () => {
                     if (this.currentProject) {
-                        this.loadTranscriptions(this.currentProject);
-                        this.selectProject(this.currentProject);
+                        try {
+                            console.log('Polling for updates...');
+
+                            // Store current transcription count for comparison
+                            const previousTranscriptionCount = this.transcriptions.length;
+
+                            // Refresh project list to maintain proper sorting by update time
+                            await this.loadProjects();
+
+                            // Refresh transcriptions and project data
+                            if (this.currentProject) {
+                                await this.loadTranscriptions(this.currentProject);
+                                await this.selectProject(this.currentProject);
+
+                                // Log if new transcriptions were found
+                                const currentTranscriptionCount = this.transcriptions.length;
+                                if (currentTranscriptionCount > previousTranscriptionCount) {
+                                    const newCount = currentTranscriptionCount - previousTranscriptionCount;
+                                    console.log(`Found ${newCount} new transcription(s) during poll`);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error during polling:', error);
+                        }
                     }
-                }, 5000); // Poll every 5 seconds
+                }, 3000); // Poll every 3 seconds during recording
             }
 
             stopPollingForUpdates() {
                 if (this.pollingInterval) {
                     clearInterval(this.pollingInterval);
                     this.pollingInterval = null;
+                }
+            }
+
+            async deleteProject(projectId) {
+                const projectName = this.projects.find(p => p.project_id === projectId)?.name || 'this project';
+
+                if (!confirm(`Are you sure you want to delete "${projectName}"? This will permanently remove all recordings, transcriptions, and TRD data for this project.`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/delete_project/${projectId}/`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        console.log(`Project ${projectId} deleted successfully`);
+
+                        // If deleted project was currently selected, clear the selection
+                        if (this.currentProject === projectId) {
+                            this.currentProject = null;
+                            document.getElementById('project-content').textContent = 'Select a project to view its TRD content';
+                            document.getElementById('record-btn').disabled = true;
+                            document.getElementById('transcription-list').innerHTML = '<div class="empty-state">Select a project to view transcriptions</div>';
+                            document.getElementById('transcription-content').innerHTML = '<div class="empty-state">Select a transcription chunk to view details</div>';
+                        }
+
+                        // Reload projects list
+                        await this.loadProjects();
+
+                        // Select first project if any remain
+                        if (this.projects.length > 0 && !this.currentProject) {
+                            this.selectProject(this.projects[0].project_id);
+                        }
+
+                    } else {
+                        this.showError(data.error || 'Failed to delete project');
+                    }
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    this.showError('Failed to delete project');
+                }
+            }
+
+            formatDateTime(dateString) {
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                if (diffMinutes < 1) {
+                    return 'Just now';
+                } else if (diffMinutes < 60) {
+                    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+                } else if (diffHours < 24) {
+                    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+                } else if (diffDays < 7) {
+                    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+                } else {
+                    // For older than a week, show full date with time
+                    return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                }
+            }
+
+            async manualRefresh() {
+                const refreshBtn = document.getElementById('refresh-btn');
+
+                try {
+                    // Add visual feedback
+                    refreshBtn.innerHTML = '🔄 Refreshing...';
+                    refreshBtn.disabled = true;
+
+                    console.log('Manual refresh triggered');
+
+                    // Refresh projects list (will maintain sort order)
+                    await this.loadProjects();
+
+                    // If we have a current project, refresh its data
+                    if (this.currentProject) {
+                        await this.loadTranscriptions(this.currentProject);
+                        await this.selectProject(this.currentProject);
+                        console.log(`Refreshed data for project: ${this.currentProject}`);
+                    }
+
+                    console.log('Manual refresh completed');
+                } catch (error) {
+                    console.error('Error during manual refresh:', error);
+                    this.showError('Failed to refresh data');
+                } finally {
+                    // Restore button
+                    refreshBtn.innerHTML = '🔄 Refresh';
+                    refreshBtn.disabled = false;
                 }
             }
 

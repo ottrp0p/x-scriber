@@ -84,6 +84,42 @@ class ProjectHandler:
         print(f"Created project '{name}' with ID: {project_id}")
         return project_id
 
+    def delete_project(self, project_id: str) -> bool:
+        """Delete a project and all its associated files"""
+        try:
+            import shutil
+
+            # Delete metadata file
+            metadata_file = self.metadata_dir / f"{project_id}_metadata.json"
+            if metadata_file.exists():
+                metadata_file.unlink()
+
+            # Delete all audio files for this project
+            for audio_file in self.audio_dir.glob(f"{project_id}_audiochunk_*.webm"):
+                audio_file.unlink()
+            for audio_file in self.audio_dir.glob(f"{project_id}_audiochunk_*.wav"):
+                audio_file.unlink()
+
+            # Delete all transcription files for this project
+            for trans_file in self.transcription_dir.glob(f"{project_id}_transcription_*.json"):
+                trans_file.unlink()
+
+            # Delete TRD file
+            trd_file = self.output_dir / f"{project_id}_trd.md"
+            if trd_file.exists():
+                trd_file.unlink()
+
+            # Delete cached TRD files
+            for cache_file in self.output_cache_dir.glob(f"{project_id}_trd_*.md"):
+                cache_file.unlink()
+
+            print(f"Successfully deleted project {project_id} and all associated files")
+            return True
+
+        except Exception as e:
+            print(f"Error deleting project {project_id}: {str(e)}")
+            return False
+
     def get_project_metadata(self, project_id: str) -> Optional[Dict[str, Any]]:
         metadata_file = self.metadata_dir / f"{project_id}_metadata.json"
         if not metadata_file.exists():
@@ -196,6 +232,8 @@ class ProjectHandler:
 
     def _trd_update_worker(self):
         print("TRD WORKER: TRD update worker thread started")
+        processed_projects = set()  # Track projects we've already processed comprehensively
+
         while self.is_processing:
             try:
                 item = self.trd_update_queue.get(timeout=1.0)
@@ -203,10 +241,17 @@ class ProjectHandler:
                     break
 
                 project_id, transcription_file = item
-                print(f"TRD WORKER: Processing TRD update for project {project_id}")
-                self._update_trd_document(project_id, transcription_file)
+
+                # Use comprehensive update instead of individual transcription processing
+                if project_id not in processed_projects:
+                    print(f"TRD WORKER: Processing comprehensive TRD update for project {project_id}")
+                    self._update_trd_document_comprehensive(project_id)
+                    processed_projects.add(project_id)
+                    print(f"TRD WORKER: Completed comprehensive TRD update for project {project_id}")
+                else:
+                    print(f"TRD WORKER: Project {project_id} already processed comprehensively in this session")
+
                 self.trd_update_queue.task_done()
-                print(f"TRD WORKER: Completed TRD update for project {project_id}")
 
             except queue.Empty:
                 continue
@@ -270,6 +315,63 @@ class ProjectHandler:
             import traceback
             traceback.print_exc()
 
+    def _update_trd_document_comprehensive(self, project_id: str):
+        """
+        Update TRD document using all transcriptions at once for better context and less duplication.
+        """
+        try:
+            print(f"TRD COMPREHENSIVE UPDATE: Starting comprehensive TRD update for project {project_id}")
+
+            # Get all transcriptions for this project
+            all_transcriptions = []
+            transcription_files = list(self.transcription_dir.glob(f"{project_id}_transcription_*.json"))
+            transcription_files.sort(key=lambda x: int(x.stem.split('_')[-1]) if x.stem.split('_')[-1].isdigit() else 0)
+
+            for trans_file in transcription_files:
+                try:
+                    with open(trans_file, 'r') as f:
+                        transcription_data = json.load(f)
+                        transcription_text = transcription_data.get("text", "")
+                        if transcription_text:
+                            all_transcriptions.append(transcription_text)
+                except Exception as e:
+                    print(f"Error reading transcription {trans_file}: {str(e)}")
+                    continue
+
+            if not all_transcriptions:
+                print(f"No valid transcriptions found for project {project_id}")
+                return
+
+            print(f"TRD COMPREHENSIVE UPDATE: Found {len(all_transcriptions)} transcriptions")
+
+            trd_file = self.output_dir / f"{project_id}_trd.md"
+            existing_trd = ""
+            if trd_file.exists():
+                with open(trd_file, 'r') as f:
+                    existing_trd = f.read()
+                print(f"TRD COMPREHENSIVE UPDATE: Found existing TRD file with {len(existing_trd)} characters")
+
+                # Cache the existing version before updating
+                self._cache_trd_version(project_id, existing_trd)
+            else:
+                print(f"TRD COMPREHENSIVE UPDATE: No existing TRD file, creating new one")
+
+            print(f"TRD COMPREHENSIVE UPDATE: Calling OpenAI Chat Completions API with all transcriptions...")
+            updated_trd = self.chat_processor.process_all_transcriptions_to_trd(
+                all_transcriptions, existing_trd
+            )
+
+            # Write the completely new TRD (replacement, not append)
+            with open(trd_file, 'w') as f:
+                f.write(updated_trd)
+
+            print(f"TRD COMPREHENSIVE UPDATE: Successfully updated TRD document for project {project_id}")
+
+        except Exception as e:
+            print(f"TRD COMPREHENSIVE UPDATE ERROR: Error updating TRD document: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
     def get_trd_content(self, project_id: str) -> str:
         trd_file = self.output_dir / f"{project_id}_trd.md"
         if not trd_file.exists():
@@ -303,6 +405,19 @@ class ProjectHandler:
 
         transcriptions.sort(key=lambda x: x["chunk_id"])
         return transcriptions
+
+    def regenerate_trd_comprehensive(self, project_id: str) -> bool:
+        """
+        Manually trigger a comprehensive TRD regeneration for a project.
+        Useful for updating existing projects with the new comprehensive method.
+        """
+        try:
+            print(f"Manual comprehensive TRD regeneration requested for project {project_id}")
+            self._update_trd_document_comprehensive(project_id)
+            return True
+        except Exception as e:
+            print(f"Error in manual TRD regeneration: {str(e)}")
+            return False
 
     def cleanup(self):
         self.recording_handler.cleanup()

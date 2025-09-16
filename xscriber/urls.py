@@ -13,4 +13,5 @@ urlpatterns = [
     path('api/recording/stop/', views.stop_recording, name='stop_recording'),
     path('api/recording/upload_chunk/', views.upload_audio_chunk, name='upload_audio_chunk'),
     path('api/create_project/', views.create_project, name='create_project'),
+    path('api/delete_project/<str:project_id>/', views.delete_project, name='delete_project'),
 ]

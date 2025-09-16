@@ -126,11 +126,29 @@ def upload_audio_chunk(request):
     if request.method == 'POST':
         try:
             project_id = request.POST.get('project_id')
-            chunk_number = request.POST.get('chunk_number')
             audio_file = request.FILES.get('audio_chunk')
 
-            if not all([project_id, chunk_number, audio_file]):
+            if not all([project_id, audio_file]):
                 return JsonResponse({'error': 'Missing required parameters'}, status=400)
+
+            # Automatically determine the next chunk number based on existing files
+            output_dir = os.path.join('data', 'audio-recordings')
+            existing_files = [f for f in os.listdir(output_dir) if f.startswith(f"{project_id}_audiochunk_") and (f.endswith('.webm') or f.endswith('.wav'))]
+
+            if not existing_files:
+                chunk_number = 1
+            else:
+                # Find the highest existing chunk number
+                max_chunk = 0
+                for filename in existing_files:
+                    try:
+                        # Extract number from filename like "project_audiochunk_5.webm"
+                        chunk_part = filename.split('_audiochunk_')[-1].split('.')[0]
+                        chunk_num = int(chunk_part)
+                        max_chunk = max(max_chunk, chunk_num)
+                    except (ValueError, IndexError):
+                        continue
+                chunk_number = max_chunk + 1
 
             # Create temporary file for the uploaded audio
             with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as temp_webm:
@@ -181,6 +199,7 @@ def upload_audio_chunk(request):
                 return JsonResponse({
                     'status': 'success',
                     'filename': filename,
+                    'chunk_number': chunk_number,
                     'size': file_size,
                     'duration': duration,
                     'format': 'wav' if filename.endswith('.wav') else 'webm',
@@ -194,6 +213,22 @@ def upload_audio_chunk(request):
                 # Clean up temporary file
                 if os.path.exists(temp_webm_path):
                     os.unlink(temp_webm_path)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def delete_project(request, project_id):
+    if request.method == 'DELETE':
+        try:
+            success = project_handler.delete_project(project_id)
+
+            if success:
+                return JsonResponse({'status': 'project_deleted', 'project_id': project_id})
+            else:
+                return JsonResponse({'error': 'Project not found or failed to delete'}, status=404)
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
