@@ -337,6 +337,13 @@
                 this.projects = [];
                 this.transcriptions = [];
 
+                // Audio recording properties
+                this.mediaRecorder = null;
+                this.audioStream = null;
+                this.recordingChunks = [];
+                this.chunkCounter = 1;
+                this.chunkInterval = null;
+
                 this.initializeEventListeners();
                 this.loadProjects();
                 this.updateRecordingStatus();
@@ -522,50 +529,122 @@
                 }
 
                 try {
-                    const response = await fetch('/api/recording/start/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ project_id: this.currentProject })
+                    // Request microphone access
+                    this.audioStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100
+                        }
                     });
 
-                    const data = await response.json();
+                    // Initialize MediaRecorder
+                    this.mediaRecorder = new MediaRecorder(this.audioStream, {
+                        mimeType: 'audio/webm;codecs=opus'
+                    });
 
-                    if (response.ok) {
-                        this.isRecording = true;
-                        this.updateRecordingStatus();
-                        this.startPollingForUpdates();
-                    } else {
-                        this.showError(data.error || 'Failed to start recording');
-                    }
+                    this.recordingChunks = [];
+                    this.chunkCounter = 1;
+
+                    // Handle data available (when we stop recording a chunk)
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.recordingChunks.push(event.data);
+                        }
+                    };
+
+                    // Handle chunk completion
+                    this.mediaRecorder.onstop = () => {
+                        this.uploadAudioChunk();
+                    };
+
+                    // Start recording
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    this.updateRecordingStatus();
+
+                    // Set up automatic chunking every 30 seconds
+                    this.chunkInterval = setInterval(() => {
+                        if (this.isRecording && this.mediaRecorder.state === 'recording') {
+                            // Stop current chunk and start new one
+                            this.mediaRecorder.stop();
+                            this.mediaRecorder.start();
+                        }
+                    }, 30000); // 30 seconds
+
+                    this.startPollingForUpdates();
+
+                    console.log('Recording started successfully');
+
                 } catch (error) {
                     console.error('Error starting recording:', error);
-                    this.showError('Failed to start recording');
+                    this.showError('Failed to access microphone. Please check permissions.');
                 }
             }
 
             async stopRecording() {
                 try {
-                    const response = await fetch('/api/recording/stop/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        this.isRecording = false;
-                        this.updateRecordingStatus();
-                        this.stopPollingForUpdates();
-                    } else {
-                        this.showError(data.error || 'Failed to stop recording');
+                    // Stop the MediaRecorder
+                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                        this.mediaRecorder.stop();
                     }
+
+                    // Stop the audio stream
+                    if (this.audioStream) {
+                        this.audioStream.getTracks().forEach(track => track.stop());
+                        this.audioStream = null;
+                    }
+
+                    // Clear the chunk interval
+                    if (this.chunkInterval) {
+                        clearInterval(this.chunkInterval);
+                        this.chunkInterval = null;
+                    }
+
+                    this.isRecording = false;
+                    this.updateRecordingStatus();
+                    this.stopPollingForUpdates();
+
+                    console.log('Recording stopped successfully');
+
                 } catch (error) {
                     console.error('Error stopping recording:', error);
                     this.showError('Failed to stop recording');
+                }
+            }
+
+            async uploadAudioChunk() {
+                if (this.recordingChunks.length === 0) return;
+
+                try {
+                    // Create a blob from the recorded chunks
+                    const audioBlob = new Blob(this.recordingChunks, { type: 'audio/webm' });
+
+                    // Create FormData for upload
+                    const formData = new FormData();
+                    formData.append('project_id', this.currentProject);
+                    formData.append('chunk_number', this.chunkCounter);
+                    formData.append('audio_chunk', audioBlob, `chunk_${this.chunkCounter}.webm`);
+
+                    // Upload the chunk
+                    const response = await fetch('/api/recording/upload_chunk/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`Uploaded chunk ${this.chunkCounter}:`, data);
+                        this.chunkCounter++;
+                    } else {
+                        console.error('Failed to upload audio chunk:', response.statusText);
+                    }
+
+                    // Clear the chunks for the next recording
+                    this.recordingChunks = [];
+
+                } catch (error) {
+                    console.error('Error uploading audio chunk:', error);
                 }
             }
 

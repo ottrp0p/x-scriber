@@ -3,6 +3,14 @@
 ## Project Overview
 X-Scriber is a Python-based service that uses OpenAI Whisper for live transcription and OpenAI Chat Completions to generate Technical Requirements Documents (TRDs) from recorded audio.
 
+
+## TODO Tracking ## 
+There is a TODO.md in docs folder. You will write this in the following fashion. 
+
+For a plan created at time t, write down the timestamp, then the full todo list. Each on its own line. For this live session as you complete task, edit the tasks on each line to indicate whether they were finished or not. 
+
+If a new invocation of writing the repo based off the trd/prd document. refer to the TODO.md and check what was completed during the last session before making a new plan. 
+
 ## Folder Structure Restrictions
 
 ### CRITICAL: Data Folder Protection
