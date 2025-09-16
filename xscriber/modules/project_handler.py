@@ -20,6 +20,7 @@ class ProjectHandler:
         self.audio_dir = self.data_dir / 'audio-recordings'
         self.transcription_dir = self.data_dir / 'raw-transcriptions'
         self.output_dir = self.data_dir / 'output'
+        self.output_cache_dir = self.data_dir / 'output_cache'
 
         self._ensure_directories()
 
@@ -35,7 +36,7 @@ class ProjectHandler:
         self._start_worker_threads()
 
     def _ensure_directories(self):
-        for directory in [self.metadata_dir, self.audio_dir, self.transcription_dir, self.output_dir]:
+        for directory in [self.metadata_dir, self.audio_dir, self.transcription_dir, self.output_dir, self.output_cache_dir]:
             directory.mkdir(parents=True, exist_ok=True)
 
     def _start_worker_threads(self):
@@ -184,7 +185,9 @@ class ProjectHandler:
                 self.update_project_metadata(project_id, {"transcription_count":
                     self.get_project_metadata(project_id).get("transcription_count", 0) + 1})
 
+                print(f"TRD QUEUE: Adding transcription to TRD update queue: {str(transcription_file)}")
                 self.trd_update_queue.put((project_id, str(transcription_file)))
+                print(f"TRD QUEUE: Queue size is now: {self.trd_update_queue.qsize()}")
             else:
                 print(f"Transcription failed for {audio_filename}")
 
@@ -192,6 +195,7 @@ class ProjectHandler:
             print(f"Error processing transcription: {str(e)}")
 
     def _trd_update_worker(self):
+        print("TRD WORKER: TRD update worker thread started")
         while self.is_processing:
             try:
                 item = self.trd_update_queue.get(timeout=1.0)
@@ -199,16 +203,35 @@ class ProjectHandler:
                     break
 
                 project_id, transcription_file = item
+                print(f"TRD WORKER: Processing TRD update for project {project_id}")
                 self._update_trd_document(project_id, transcription_file)
                 self.trd_update_queue.task_done()
+                print(f"TRD WORKER: Completed TRD update for project {project_id}")
 
             except queue.Empty:
                 continue
             except Exception as e:
-                print(f"Error in TRD update worker: {str(e)}")
+                print(f"TRD WORKER ERROR: Error in TRD update worker: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+    def _cache_trd_version(self, project_id: str, existing_trd: str):
+        """Cache the current TRD version before updating"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        cache_file = self.output_cache_dir / f"{project_id}_trd_{timestamp}.md"
+
+        try:
+            with open(cache_file, 'w') as f:
+                f.write(existing_trd)
+            print(f"TRD UPDATE: Cached previous version to {cache_file}")
+        except Exception as e:
+            print(f"TRD UPDATE: Failed to cache TRD version: {str(e)}")
 
     def _update_trd_document(self, project_id: str, transcription_file: str):
         try:
+            print(f"TRD UPDATE: Starting TRD update for project {project_id} with transcription {transcription_file}")
+
             with open(transcription_file, 'r') as f:
                 transcription_data = json.load(f)
 
@@ -217,23 +240,35 @@ class ProjectHandler:
                 print(f"No text found in transcription file: {transcription_file}")
                 return
 
+            print(f"TRD UPDATE: Found transcription text: {transcription_text[:100]}...")
+
             trd_file = self.output_dir / f"{project_id}_trd.md"
             existing_trd = ""
             if trd_file.exists():
                 with open(trd_file, 'r') as f:
                     existing_trd = f.read()
+                print(f"TRD UPDATE: Found existing TRD file with {len(existing_trd)} characters")
 
+                # Cache the existing version before updating
+                self._cache_trd_version(project_id, existing_trd)
+            else:
+                print(f"TRD UPDATE: No existing TRD file, creating new one")
+
+            print(f"TRD UPDATE: Calling OpenAI Chat Completions API...")
             updated_trd = self.chat_processor.process_transcription_to_trd(
                 transcription_text, existing_trd
             )
 
+            # Write the completely new TRD (replacement, not append)
             with open(trd_file, 'w') as f:
                 f.write(updated_trd)
 
-            print(f"Updated TRD document for project {project_id}")
+            print(f"TRD UPDATE: Successfully updated TRD document for project {project_id}")
 
         except Exception as e:
-            print(f"Error updating TRD document: {str(e)}")
+            print(f"TRD UPDATE ERROR: Error updating TRD document: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     def get_trd_content(self, project_id: str) -> str:
         trd_file = self.output_dir / f"{project_id}_trd.md"

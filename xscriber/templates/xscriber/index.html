@@ -563,14 +563,14 @@
                     this.isRecording = true;
                     this.updateRecordingStatus();
 
-                    // Set up automatic chunking every 30 seconds
+                    // Set up automatic chunking every 60 seconds
                     this.chunkInterval = setInterval(() => {
                         if (this.isRecording && this.mediaRecorder.state === 'recording') {
                             // Stop current chunk and start new one
                             this.mediaRecorder.stop();
                             this.mediaRecorder.start();
                         }
-                    }, 30000); // 30 seconds
+                    }, 60000); // 60 seconds
 
                     this.startPollingForUpdates();
 

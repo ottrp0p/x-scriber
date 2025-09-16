@@ -28,11 +28,28 @@ class WhisperTranscriber:
                     response_format="verbose_json"
                 )
 
+            # Convert segments to serializable dictionaries if present
+            segments = []
+            if hasattr(transcript, 'segments') and transcript.segments:
+                for segment in transcript.segments:
+                    segments.append({
+                        "id": getattr(segment, 'id', None),
+                        "seek": getattr(segment, 'seek', None),
+                        "start": getattr(segment, 'start', None),
+                        "end": getattr(segment, 'end', None),
+                        "text": getattr(segment, 'text', ''),
+                        "tokens": getattr(segment, 'tokens', []),
+                        "temperature": getattr(segment, 'temperature', None),
+                        "avg_logprob": getattr(segment, 'avg_logprob', None),
+                        "compression_ratio": getattr(segment, 'compression_ratio', None),
+                        "no_speech_prob": getattr(segment, 'no_speech_prob', None)
+                    })
+
             return {
                 "text": transcript.text,
                 "language": transcript.language,
                 "duration": transcript.duration,
-                "segments": transcript.segments if hasattr(transcript, 'segments') else []
+                "segments": segments
             }
         except Exception as e:
             raise Exception(f"Transcription failed: {str(e)}")
