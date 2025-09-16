@@ -1,0 +1,31 @@
+{
+  "text": "The system architecture should follow a microservices pattern with separate services for authentication, user management, and authorization. We'll use JWT tokens for session management with a 24-hour expiration time and refresh token functionality. The authentication service should be built using Node.js with Express framework and PostgreSQL database. All API endpoints must be RESTful and properly documented with OpenAPI specification.",
+  "language": "english",
+  "duration": 28.7,
+  "segments": [
+    {
+      "id": 0,
+      "seek": 0,
+      "start": 0.0,
+      "end": 6.1,
+      "text": " The system architecture should follow a microservices pattern",
+      "tokens": [50364, 440, 1185, 7821, 820, 1524, 257, 4532, 30731, 5102, 50669],
+      "temperature": 0.0,
+      "avg_logprob": -0.2,
+      "compression_ratio": 1.3,
+      "no_speech_prob": 0.005
+    },
+    {
+      "id": 1,
+      "seek": 0,
+      "start": 6.1,
+      "end": 15.3,
+      "text": " with separate services for authentication, user management, and authorization",
+      "tokens": [50669, 365, 4994, 3328, 337, 19888, 11, 4195, 4592, 11, 293, 18237, 51129],
+      "temperature": 0.0,
+      "avg_logprob": -0.2,
+      "compression_ratio": 1.3,
+      "no_speech_prob": 0.005
+    }
+  ]
+}

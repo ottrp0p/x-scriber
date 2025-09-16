@@ -1,0 +1,31 @@
+{
+  "text": "We need to build a new user authentication system for our web application. The system should support multiple login methods including email and password, Google OAuth, and GitHub OAuth. The authentication should be secure with proper password hashing using bcrypt and should include features like password reset functionality via email. We also need to implement role-based access control with at least three user roles: admin, editor, and viewer.",
+  "language": "english",
+  "duration": 25.4,
+  "segments": [
+    {
+      "id": 0,
+      "seek": 0,
+      "start": 0.0,
+      "end": 5.2,
+      "text": " We need to build a new user authentication system",
+      "tokens": [50364, 492, 643, 281, 1322, 257, 777, 4195, 19888, 1185, 50590],
+      "temperature": 0.0,
+      "avg_logprob": -0.3,
+      "compression_ratio": 1.2,
+      "no_speech_prob": 0.01
+    },
+    {
+      "id": 1,
+      "seek": 0,
+      "start": 5.2,
+      "end": 12.8,
+      "text": " for our web application. The system should support multiple login methods",
+      "tokens": [50590, 337, 527, 3139, 3861, 13, 440, 1185, 820, 1406, 3866, 24276, 7150, 50970],
+      "temperature": 0.0,
+      "avg_logprob": -0.3,
+      "compression_ratio": 1.2,
+      "no_speech_prob": 0.01
+    }
+  ]
+}

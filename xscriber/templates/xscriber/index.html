@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Scriber - Live Transcription & TRD Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            height: calc(100vh - 150px);
+        }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .project-selector {
+            grid-row: 1 / 3;
+        }
+
+        .project-viewer {
+            grid-row: 1 / 3;
+        }
+
+        .transcription-selector {
+            grid-row: 1 / 3;
+        }
+
+        .transcription-viewer {
+            grid-row: 1 / 3;
+        }
+
+        .control-buttons {
+            grid-column: 1 / 5;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #219a52;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .project-list, .transcription-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .project-item, .transcription-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-left: 4px solid transparent;
+        }
+
+        .project-item:hover, .transcription-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .project-item.active, .transcription-item.active {
+            background-color: #3498db;
+            color: white;
+            border-left-color: #2980b9;
+        }
+
+        .project-item h4 {
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .project-item p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Consolas', monospace;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        .recording-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .recording-status.active {
+            background-color: #dc3545;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        .recording-status.inactive {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h4 {
+            margin: 0;
+            color: #2c3e50;
+        }
+
+        .modal-footer {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .modal-footer .btn {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>X-Scriber</h1>
+            <p>Live Transcription & Technical Requirements Document Generator</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Project Selector Panel -->
+            <div class="panel project-selector">
+                <h3>Projects</h3>
+                <div id="project-list" class="project-list">
+                    <div class="empty-state">Loading projects...</div>
+                </div>
+            </div>
+
+            <!-- Project Viewer Panel -->
+            <div class="panel project-viewer">
+                <h3>Technical Requirements Document</h3>
+                <div id="project-content" class="content-area">
+                    <div class="empty-state">Select a project to view its TRD</div>
+                </div>
+            </div>
+
+            <!-- Transcription Selector Panel -->
+            <div class="panel transcription-selector">
+                <h3>Transcription Chunks</h3>
+                <div id="transcription-list" class="transcription-list">
+                    <div class="empty-state">Select a project to view transcriptions</div>
+                </div>
+            </div>
+
+            <!-- Transcription Viewer Panel -->
+            <div class="panel transcription-viewer">
+                <h3>Transcription Detail</h3>
+                <div id="transcription-content" class="content-area">
+                    <div class="empty-state">Select a transcription chunk to view details</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="control-buttons">
+            <button id="new-project-btn" class="btn btn-primary">New Project</button>
+            <button id="record-btn" class="btn btn-success" disabled>Start Recording</button>
+            <button id="stop-btn" class="btn btn-danger" disabled>Stop Recording</button>
+            <span id="recording-status" class="recording-status inactive">Not Recording</span>
+        </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div id="project-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4>Create New Project</h4>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="project-name">Project Name:</label>
+                    <input type="text" id="project-name" placeholder="Enter project name">
+                </div>
+                <div class="form-group">
+                    <label for="project-description">Description:</label>
+                    <textarea id="project-description" placeholder="Enter project description" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-project-btn" class="btn btn-secondary">Cancel</button>
+                <button id="create-project-btn" class="btn btn-primary">Create Project</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class XScriber {
+            constructor() {
+                this.currentProject = null;
+                this.currentTranscription = null;
+                this.isRecording = false;
+                this.projects = [];
+                this.transcriptions = [];
+
+                this.initializeEventListeners();
+                this.loadProjects();
+                this.updateRecordingStatus();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('new-project-btn').addEventListener('click', () => this.showNewProjectModal());
+                document.getElementById('record-btn').addEventListener('click', () => this.startRecording());
+                document.getElementById('stop-btn').addEventListener('click', () => this.stopRecording());
+                document.getElementById('create-project-btn').addEventListener('click', () => this.createProject());
+                document.getElementById('cancel-project-btn').addEventListener('click', () => this.hideNewProjectModal());
+
+                window.addEventListener('click', (event) => {
+                    const modal = document.getElementById('project-modal');
+                    if (event.target === modal) {
+                        this.hideNewProjectModal();
+                    }
+                });
+            }
+
+            async loadProjects() {
+                try {
+                    const response = await fetch('/api/projects/');
+                    const data = await response.json();
+                    this.projects = data.projects || [];
+                    this.renderProjects();
+
+                    if (this.projects.length > 0) {
+                        this.selectProject(this.projects[0].project_id);
+                    }
+                } catch (error) {
+                    console.error('Error loading projects:', error);
+                    this.showError('Failed to load projects');
+                }
+            }
+
+            renderProjects() {
+                const projectList = document.getElementById('project-list');
+
+                if (this.projects.length === 0) {
+                    projectList.innerHTML = '<div class="empty-state">No projects found. Create your first project!</div>';
+                    return;
+                }
+
+                projectList.innerHTML = this.projects.map(project => `
+                    <div class="project-item" data-project-id="${project.project_id}">
+                        <h4>${project.name}</h4>
+                        <p>${project.description || 'No description'}</p>
+                        <small>Updated: ${new Date(project.last_updated).toLocaleDateString()}</small>
+                    </div>
+                `).join('');
+
+                projectList.querySelectorAll('.project-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const projectId = item.dataset.projectId;
+                        this.selectProject(projectId);
+                    });
+                });
+            }
+
+            async selectProject(projectId) {
+                try {
+                    this.currentProject = projectId;
+
+                    document.querySelectorAll('.project-item').forEach(item => {
+                        item.classList.toggle('active', item.dataset.projectId === projectId);
+                    });
+
+                    document.getElementById('record-btn').disabled = false;
+
+                    const response = await fetch(`/api/projects/${projectId}/`);
+                    const data = await response.json();
+
+                    document.getElementById('project-content').textContent = data.trd_content || 'No TRD content available';
+
+                    await this.loadTranscriptions(projectId);
+
+                } catch (error) {
+                    console.error('Error selecting project:', error);
+                    this.showError('Failed to load project details');
+                }
+            }
+
+            async loadTranscriptions(projectId) {
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/transcriptions/`);
+                    const data = await response.json();
+                    this.transcriptions = data.transcriptions || [];
+                    this.renderTranscriptions();
+                } catch (error) {
+                    console.error('Error loading transcriptions:', error);
+                    this.showError('Failed to load transcriptions');
+                }
+            }
+
+            renderTranscriptions() {
+                const transcriptionList = document.getElementById('transcription-list');
+
+                if (this.transcriptions.length === 0) {
+                    transcriptionList.innerHTML = '<div class="empty-state">No transcriptions available</div>';
+                    document.getElementById('transcription-content').innerHTML = '<div class="empty-state">No transcriptions available</div>';
+                    return;
+                }
+
+                transcriptionList.innerHTML = this.transcriptions.map(transcription => `
+                    <div class="transcription-item" data-chunk-id="${transcription.chunk_id}">
+                        <h4>Chunk ${transcription.chunk_id}</h4>
+                        <p>Duration: ${transcription.duration.toFixed(1)}s</p>
+                        <p>Language: ${transcription.language}</p>
+                        <small>${transcription.text.substring(0, 50)}...</small>
+                    </div>
+                `).join('');
+
+                transcriptionList.querySelectorAll('.transcription-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const chunkId = item.dataset.chunkId;
+                        this.selectTranscription(chunkId);
+                    });
+                });
+            }
+
+            selectTranscription(chunkId) {
+                this.currentTranscription = chunkId;
+
+                document.querySelectorAll('.transcription-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.chunkId === chunkId);
+                });
+
+                const transcription = this.transcriptions.find(t => t.chunk_id.toString() === chunkId);
+                if (transcription) {
+                    document.getElementById('transcription-content').textContent = transcription.text;
+                }
+            }
+
+            showNewProjectModal() {
+                document.getElementById('project-modal').style.display = 'block';
+                document.getElementById('project-name').focus();
+            }
+
+            hideNewProjectModal() {
+                document.getElementById('project-modal').style.display = 'none';
+                document.getElementById('project-name').value = '';
+                document.getElementById('project-description').value = '';
+            }
+
+            async createProject() {
+                const name = document.getElementById('project-name').value.trim();
+                const description = document.getElementById('project-description').value.trim();
+
+                if (!name) {
+                    alert('Please enter a project name');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/create_project/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ name, description })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.hideNewProjectModal();
+                        await this.loadProjects();
+                        this.selectProject(data.project_id);
+                    } else {
+                        this.showError(data.error || 'Failed to create project');
+                    }
+                } catch (error) {
+                    console.error('Error creating project:', error);
+                    this.showError('Failed to create project');
+                }
+            }
+
+            async startRecording() {
+                if (!this.currentProject) {
+                    alert('Please select a project first');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/recording/start/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ project_id: this.currentProject })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.isRecording = true;
+                        this.updateRecordingStatus();
+                        this.startPollingForUpdates();
+                    } else {
+                        this.showError(data.error || 'Failed to start recording');
+                    }
+                } catch (error) {
+                    console.error('Error starting recording:', error);
+                    this.showError('Failed to start recording');
+                }
+            }
+
+            async stopRecording() {
+                try {
+                    const response = await fetch('/api/recording/stop/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.isRecording = false;
+                        this.updateRecordingStatus();
+                        this.stopPollingForUpdates();
+                    } else {
+                        this.showError(data.error || 'Failed to stop recording');
+                    }
+                } catch (error) {
+                    console.error('Error stopping recording:', error);
+                    this.showError('Failed to stop recording');
+                }
+            }
+
+            updateRecordingStatus() {
+                const recordBtn = document.getElementById('record-btn');
+                const stopBtn = document.getElementById('stop-btn');
+                const status = document.getElementById('recording-status');
+
+                if (this.isRecording) {
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    status.textContent = 'Recording';
+                    status.className = 'recording-status active';
+                } else {
+                    recordBtn.disabled = !this.currentProject;
+                    stopBtn.disabled = true;
+                    status.textContent = 'Not Recording';
+                    status.className = 'recording-status inactive';
+                }
+            }
+
+            startPollingForUpdates() {
+                this.pollingInterval = setInterval(() => {
+                    if (this.currentProject) {
+                        this.loadTranscriptions(this.currentProject);
+                        this.selectProject(this.currentProject);
+                    }
+                }, 5000); // Poll every 5 seconds
+            }
+
+            stopPollingForUpdates() {
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                    this.pollingInterval = null;
+                }
+            }
+
+            showError(message) {
+                alert('Error: ' + message);
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new XScriber();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "project_id": "0",
+  "name": "Sample Project",
+  "description": "This is a sample project to demonstrate X-Scriber functionality. Use this as a reference for how the system works.",
+  "created_at": "2025-09-16T10:00:00.000000",
+  "last_updated": "2025-09-16T10:00:00.000000",
+  "chunk_count": 2,
+  "transcription_count": 2
+}

@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Data directories (preserve only sample project 0)
+data/project_metadata/*
+!data/project_metadata/0_metadata.json
+
+data/audio-recordings/*
+!data/audio-recordings/.gitkeep
+
+data/raw-transcriptions/*
+!data/raw-transcriptions/0_transcription_*.json
+
+data/output/*
+!data/output/0_trd.md
+
+# Keep directory structure
+data/project_metadata/.gitkeep
+data/audio-recordings/.gitkeep
+data/raw-transcriptions/.gitkeep
+data/output/.gitkeep
