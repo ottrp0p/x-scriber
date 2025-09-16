@@ -1,6 +1,7 @@
 # X-Scriber
 
 Live microphone recording with OpenAI Whisper transcription and automatic Technical Requirements Document (TRD) generation.
+<img width="1464" height="744" alt="Screenshot 2025-09-16 at 3 11 43 AM" src="https://github.com/user-attachments/assets/2505b874-3441-4d8b-8564-4188961335c7" />
 
 ## Features
 
