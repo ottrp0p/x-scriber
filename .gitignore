@@ -62,6 +62,7 @@ data/output/*
 !data/output/0_trd.md
 
 data/output_cache/*
+!data/output_cache/ae99b41a_trd_20250923_024214.md
 
 # Keep directory structure
 data/project_metadata/.gitkeep
