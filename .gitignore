@@ -21,6 +21,10 @@ wheels/
 *.egg
 MANIFEST
 
+# virtual environments
+.venv/
+venv/
+
 # Django
 *.log
 local_settings.py
@@ -57,11 +61,15 @@ data/raw-transcriptions/*
 data/output/*
 !data/output/0_trd.md
 
+data/output_cache/*
+
 # Keep directory structure
 data/project_metadata/.gitkeep
 data/audio-recordings/.gitkeep
 data/raw-transcriptions/.gitkeep
 data/output/.gitkeep
+data/output_cache/.gitkeep
+
 
 # Test files (optional - you may want to track test results)
 tests/__pycache__/

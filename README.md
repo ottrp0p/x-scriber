@@ -16,7 +16,7 @@ Live microphone recording with OpenAI Whisper transcription and automatic Techni
 
 ### Prerequisites
 
-- Python 3.8+
+- **Python 3.12 or earlier** (Python 3.13+ not supported due to pydub dependency requiring audioop module)
 - OpenAI API key with access to Whisper and Chat Completions
 - Microphone access permissions
 
@@ -28,29 +28,35 @@ git clone <repository-url>
 cd x-scriber
 ```
 
-2. Install dependencies:
+2. Create virtual environment (with Python 3.12 or earlier):
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
+4. Set up environment variables:
 ```bash
 cp .env.example .env
 # Edit .env and add your OpenAI API key
 ```
 
-4. Run Django setup:
+5. Run Django setup:
 ```bash
 python manage.py migrate
 python manage.py collectstatic
 ```
 
-5. Start the development server:
+6. Start the development server:
 ```bash
 python manage.py runserver
 ```
 
-6. Open your browser and navigate to `http://localhost:8000`
+7. Open your browser and navigate to `http://localhost:8000`
 
 ### Configuration
 
